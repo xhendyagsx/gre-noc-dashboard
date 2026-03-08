@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  background: #050d1a;
+  color: #c8d8e8;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #0a1628; }
+::-webkit-scrollbar-thumb { background: #1a2e42; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #2a4e62; }
+
+/* Animations */
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  70%  { box-shadow: 0 0 0 6px transparent; opacity: 0.6; }
+  100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Tremor dark overrides */
+.tremor-base {
+  --tremor-brand: #00d4ff;
+  --tremor-brand-subtle: #00d4ff22;
+  --tremor-background-default: transparent;
+  --tremor-background-subtle: #0a1628;
+  --tremor-border-default: #1a2e42;
+  --tremor-content-default: #c8d8e8;
+  --tremor-content-subtle: #3a5a72;
+}
+
+/* Responsive: mobile stacked layout */
+@media (max-width: 768px) {
+  .noc-main-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
