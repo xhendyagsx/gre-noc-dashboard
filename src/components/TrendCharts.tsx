@@ -1,69 +1,45 @@
-import { AreaChart, LineChart, Title, Text } from '@tremor/react'
-import { type HourlyAgg } from '@/lib/supabase'
+import {
+  AreaChart, Area, LineChart, Line,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts'
+import { type TunnelMetric } from '@/lib/supabase'
 
-// ── Color mapping per site ────────────────────────────────────────────────────
-const SITE_COLORS: Record<string, string> = {
-  sby: 'cyan',
-  bdg: 'emerald',
-  mdn: 'blue',
-  mks: 'orange',
-  smg: 'violet',
+const SITES = [
+  { id: 'sby', name: 'Surabaya',  color: '#00d4ff' },
+  { id: 'bdg', name: 'Bandung',   color: '#00ff88' },
+  { id: 'mdn', name: 'Medan',     color: '#4488ff' },
+  { id: 'mks', name: 'Makassar',  color: '#ff8800' },
+  { id: 'smg', name: 'Semarang',  color: '#aa44ff' },
+]
+
+function toLabel(recorded_at: string): string {
+  return new Date(recorded_at).toLocaleTimeString('id-ID', {
+    hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta',
+  })
 }
 
-// ── Transform hourly agg data into Tremor-compatible format ──────────────────
+function buildSeries(
+  data: TunnelMetric[],
+  metric: keyof Pick<TunnelMetric, 'rx_mbps' | 'tx_mbps' | 'rtt_avg_ms' | 'packet_loss_pct'>,
+  siteId: string | null
+): Record<string, string | number>[] {
+  const filtered = siteId ? data.filter(d => d.site_id === siteId) : data
+  const buckets = new Map<string, Record<string, string | number>>()
 
-/** Bandwidth chart: one data point per hour_bucket, columns per site */
-function buildBandwidthSeries(hourly: HourlyAgg[], metric: 'avg_rx_mbps' | 'avg_tx_mbps') {
-  const buckets = new Map<string, Record<string, number>>()
-
-  hourly.forEach(row => {
-    const label = new Date(row.hour_bucket).toLocaleTimeString('id-ID', {
-      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta',
-    })
-    if (!buckets.has(label)) buckets.set(label, { time: label } as Record<string, number>)
-    buckets.get(label)![row.site_name] = Number(row[metric])
+  filtered.forEach(row => {
+    const label = toLabel(row.recorded_at)
+    if (!buckets.has(label)) buckets.set(label, { time: label })
+    buckets.get(label)![row.site_name] = Number(Number(row[metric]).toFixed(3))
   })
 
   return Array.from(buckets.values())
 }
 
-function buildLatencySeries(hourly: HourlyAgg[]) {
-  const buckets = new Map<string, Record<string, number>>()
-
-  hourly.forEach(row => {
-    const label = new Date(row.hour_bucket).toLocaleTimeString('id-ID', {
-      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta',
-    })
-    if (!buckets.has(label)) buckets.set(label, { time: label } as Record<string, number>)
-    buckets.get(label)![`${row.site_name} RTT`] = Number(row.avg_rtt_ms)
-    buckets.get(label)![`${row.site_name} Loss`] = Number(row.avg_loss_pct) * 10 // scale for readability
-  })
-
-  return Array.from(buckets.values())
-}
-
-function buildLossSeries(hourly: HourlyAgg[]) {
-  const buckets = new Map<string, Record<string, number>>()
-
-  hourly.forEach(row => {
-    const label = new Date(row.hour_bucket).toLocaleTimeString('id-ID', {
-      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta',
-    })
-    if (!buckets.has(label)) buckets.set(label, { time: label } as Record<string, number>)
-    buckets.get(label)![row.site_name] = Number(row.avg_loss_pct)
-  })
-
-  return Array.from(buckets.values())
-}
-
-// ── Chart panel wrapper ───────────────────────────────────────────────────────
 function ChartPanel({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return (
     <div style={{
       background: 'linear-gradient(135deg, #0a1628 0%, #071020 100%)',
-      border: '1px solid #1a2e42',
-      borderRadius: 10,
-      padding: '16px 18px',
+      border: '1px solid #1a2e42', borderRadius: 10, padding: '16px 18px',
     }}>
       <div style={{ marginBottom: 12 }}>
         <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, letterSpacing: 3, color: '#3a5a72', marginBottom: 2 }}>
@@ -76,101 +52,107 @@ function ChartPanel({ title, sub, children }: { title: string; sub?: string; chi
   )
 }
 
-// ── Individual chart components ───────────────────────────────────────────────
-
-interface ChartsProps {
-  hourly: HourlyAgg[]
-  selectedSite: string | null
+function NoData() {
+  return (
+    <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: '#253a4a' }}>
+        NO DATA IN SELECTED TIME RANGE
+      </span>
+    </div>
+  )
 }
 
-export function BandwidthChart({ hourly, selectedSite }: ChartsProps) {
-  const filtered = selectedSite ? hourly.filter(h => h.site_id === selectedSite) : hourly
-  const data = buildBandwidthSeries(filtered, 'avg_rx_mbps')
-  const sites = [...new Set(filtered.map(h => h.site_name))]
-  const colors = sites.map(s => {
-    const id = filtered.find(h => h.site_name === s)?.site_id ?? ''
-    return SITE_COLORS[id] ?? 'slate'
-  })
+const tooltipStyle = {
+  backgroundColor: '#0a1628',
+  border: '1px solid #1a2e42',
+  borderRadius: 6,
+  fontFamily: "'JetBrains Mono', monospace",
+  fontSize: 11,
+  color: '#c8d8e8',
+}
+
+interface ChartsProps {
+  trendData: TunnelMetric[]
+  selectedSite: string | null
+  trendHours: number
+}
+
+export function BandwidthChart({ trendData, selectedSite, trendHours }: ChartsProps) {
+  const data = buildSeries(trendData, 'rx_mbps', selectedSite)
+  const activeSites = selectedSite ? SITES.filter(s => s.id === selectedSite) : SITES
 
   return (
     <ChartPanel
       title="INBOUND BANDWIDTH (RX)"
-      sub={selectedSite ? `SITE: ${selectedSite.toUpperCase()}` : 'ALL SITES · 24H'}
+      sub={`${selectedSite ? selectedSite.toUpperCase() : 'ALL SITES'} · ${trendHours}H`}
     >
-      <AreaChart
-        data={data}
-        index="time"
-        categories={sites}
-        colors={colors}
-        valueFormatter={v => `${v.toFixed(1)} Mbps`}
-        showLegend={!selectedSite}
-        showGridLines={false}
-        curveType="monotone"
-        className="h-40"
-        style={{ '--tremor-background-default': 'transparent' } as React.CSSProperties}
-      />
+      {data.length === 0 ? <NoData /> : (
+        <ResponsiveContainer width="100%" height={160}>
+          <AreaChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1a2e42" />
+            <XAxis dataKey="time" tick={{ fill: '#3a5a72', fontSize: 10 }} stroke="#1a2e42" interval="preserveStartEnd" />
+            <YAxis tick={{ fill: '#3a5a72', fontSize: 10 }} stroke="#1a2e42" unit=" Mbps" width={65} />
+            <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v.toFixed(1)} Mbps`]} />
+            <Legend wrapperStyle={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#3a5a72' }} />
+            {activeSites.map(s => (
+              <Area key={s.id} type="monotone" dataKey={s.name}
+                stroke={s.color} fill={s.color} fillOpacity={0.08}
+                strokeWidth={1.5} dot={false} connectNulls />
+            ))}
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
     </ChartPanel>
   )
 }
 
-export function LatencyChart({ hourly, selectedSite }: ChartsProps) {
-  const filtered = selectedSite ? hourly.filter(h => h.site_id === selectedSite) : hourly
-  const buckets = new Map<string, Record<string, number>>()
-
-  filtered.forEach(row => {
-    const label = new Date(row.hour_bucket).toLocaleTimeString('id-ID', {
-      hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta',
-    })
-    if (!buckets.has(label)) buckets.set(label, { time: label } as Record<string, number>)
-    buckets.get(label)![row.site_name] = Number(row.avg_rtt_ms)
-  })
-
-  const data = Array.from(buckets.values())
-  const sites = [...new Set(filtered.map(h => h.site_name))]
-  const colors = sites.map(s => {
-    const id = filtered.find(h => h.site_name === s)?.site_id ?? ''
-    return SITE_COLORS[id] ?? 'slate'
-  })
+export function LatencyChart({ trendData, selectedSite, trendHours }: ChartsProps) {
+  const data = buildSeries(trendData, 'rtt_avg_ms', selectedSite)
+  const activeSites = selectedSite ? SITES.filter(s => s.id === selectedSite) : SITES
 
   return (
     <ChartPanel title="LATENCY (RTT AVG)" sub="ms · lower is better">
-      <LineChart
-        data={data}
-        index="time"
-        categories={sites}
-        colors={colors}
-        valueFormatter={v => `${v.toFixed(1)} ms`}
-        showLegend={!selectedSite}
-        showGridLines={false}
-        curveType="monotone"
-        className="h-40"
-      />
+      {data.length === 0 ? <NoData /> : (
+        <ResponsiveContainer width="100%" height={160}>
+          <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1a2e42" />
+            <XAxis dataKey="time" tick={{ fill: '#3a5a72', fontSize: 10 }} stroke="#1a2e42" interval="preserveStartEnd" />
+            <YAxis tick={{ fill: '#3a5a72', fontSize: 10 }} stroke="#1a2e42" unit=" ms" width={50} />
+            <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v.toFixed(1)} ms`]} />
+            <Legend wrapperStyle={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#3a5a72' }} />
+            {activeSites.map(s => (
+              <Line key={s.id} type="monotone" dataKey={s.name}
+                stroke={s.color} strokeWidth={1.5} dot={false} connectNulls />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      )}
     </ChartPanel>
   )
 }
 
-export function PacketLossChart({ hourly, selectedSite }: ChartsProps) {
-  const filtered = selectedSite ? hourly.filter(h => h.site_id === selectedSite) : hourly
-  const data = buildLossSeries(filtered)
-  const sites = [...new Set(filtered.map(h => h.site_name))]
-  const colors = sites.map(s => {
-    const id = filtered.find(h => h.site_name === s)?.site_id ?? ''
-    return SITE_COLORS[id] ?? 'slate'
-  })
+export function PacketLossChart({ trendData, selectedSite, trendHours }: ChartsProps) {
+  const data = buildSeries(trendData, 'packet_loss_pct', selectedSite)
+  const activeSites = selectedSite ? SITES.filter(s => s.id === selectedSite) : SITES
 
   return (
     <ChartPanel title="PACKET LOSS %" sub="threshold: >1% = alert">
-      <AreaChart
-        data={data}
-        index="time"
-        categories={sites}
-        colors={colors}
-        valueFormatter={v => `${v.toFixed(3)}%`}
-        showLegend={!selectedSite}
-        showGridLines={false}
-        curveType="monotone"
-        className="h-36"
-      />
+      {data.length === 0 ? <NoData /> : (
+        <ResponsiveContainer width="100%" height={140}>
+          <AreaChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1a2e42" />
+            <XAxis dataKey="time" tick={{ fill: '#3a5a72', fontSize: 10 }} stroke="#1a2e42" interval="preserveStartEnd" />
+            <YAxis tick={{ fill: '#3a5a72', fontSize: 10 }} stroke="#1a2e42" unit="%" width={45} />
+            <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v.toFixed(3)}%`]} />
+            <Legend wrapperStyle={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#3a5a72' }} />
+            {activeSites.map(s => (
+              <Area key={s.id} type="monotone" dataKey={s.name}
+                stroke={s.color} fill={s.color} fillOpacity={0.08}
+                strokeWidth={1.5} dot={false} connectNulls />
+            ))}
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
     </ChartPanel>
   )
 }
