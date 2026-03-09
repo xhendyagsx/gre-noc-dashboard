@@ -1,21 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   fetchLatestPerSite,
-  fetchHourlyTrend,
+  fetchTrendData,
   fetchAvailability,
   fetchAlerts,
   supabase,
   type SiteLatest,
-  type HourlyAgg,
-  type SiteAvailability,
   type TunnelMetric,
+  type SiteAvailability,
 } from '@/lib/supabase'
 
-const POLL_INTERVAL_MS = 60_000   // refresh every 60s (aligns with cron)
+const POLL_INTERVAL_MS = 60_000
 
 export interface NOCData {
   sites: SiteLatest[]
-  hourly: HourlyAgg[]
+  trendData: TunnelMetric[]
   availability: SiteAvailability[]
   alerts: TunnelMetric[]
   lastUpdated: Date | null
@@ -26,7 +25,7 @@ export interface NOCData {
 
 export function useNOCData(trendHours = 24): NOCData {
   const [sites, setSites] = useState<SiteLatest[]>([])
-  const [hourly, setHourly] = useState<HourlyAgg[]>([])
+  const [trendData, setTrendData] = useState<TunnelMetric[]>([])
   const [availability, setAvailability] = useState<SiteAvailability[]>([])
   const [alerts, setAlerts] = useState<TunnelMetric[]>([])
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
@@ -37,14 +36,14 @@ export function useNOCData(trendHours = 24): NOCData {
   const load = useCallback(async () => {
     try {
       setError(null)
-      const [s, h, a, al] = await Promise.all([
+      const [s, t, a, al] = await Promise.all([
         fetchLatestPerSite(),
-        fetchHourlyTrend(trendHours),
+        fetchTrendData(trendHours),
         fetchAvailability(),
         fetchAlerts(),
       ])
       setSites(s)
-      setHourly(h)
+      setTrendData(t)
       setAvailability(a)
       setAlerts(al)
       setLastUpdated(new Date())
@@ -58,22 +57,18 @@ export function useNOCData(trendHours = 24): NOCData {
   useEffect(() => {
     load()
     timerRef.current = setInterval(load, POLL_INTERVAL_MS)
-
-    // Realtime subscription: instant update when new row inserted
     const channel = supabase
       .channel('gre_metrics_insert')
-      .on(
-        'postgres_changes',
+      .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'gre_tunnel_metrics' },
         () => { load() }
       )
       .subscribe()
-
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
       supabase.removeChannel(channel)
     }
   }, [load])
 
-  return { sites, hourly, availability, alerts, lastUpdated, isLoading, error, refresh: load }
+  return { sites, trendData, availability, alerts, lastUpdated, isLoading, error, refresh: load }
 }
