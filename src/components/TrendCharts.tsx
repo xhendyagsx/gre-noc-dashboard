@@ -92,7 +92,7 @@ export function BandwidthChart({ trendData, selectedSite, trendHours }: ChartsPr
             <CartesianGrid strokeDasharray="3 3" stroke="#1a2e42" />
             <XAxis dataKey="time" tick={{ fill: '#3a5a72', fontSize: 10 }} stroke="#1a2e42" interval="preserveStartEnd" />
             <YAxis tick={{ fill: '#3a5a72', fontSize: 10 }} stroke="#1a2e42" unit=" Mbps" width={65} />
-            <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v.toFixed(1)} Mbps`]} />
+            <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${Number(v).toFixed(1)} Mbps`]} />
             <Legend wrapperStyle={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#3a5a72' }} />
             {activeSites.map(s => (
               <Area key={s.id} type="monotone" dataKey={s.name}
@@ -118,7 +118,7 @@ export function LatencyChart({ trendData, selectedSite, trendHours }: ChartsProp
             <CartesianGrid strokeDasharray="3 3" stroke="#1a2e42" />
             <XAxis dataKey="time" tick={{ fill: '#3a5a72', fontSize: 10 }} stroke="#1a2e42" interval="preserveStartEnd" />
             <YAxis tick={{ fill: '#3a5a72', fontSize: 10 }} stroke="#1a2e42" unit=" ms" width={50} />
-            <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v.toFixed(1)} ms`]} />
+            <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${Number(v).toFixed(1)} ms`]} />
             <Legend wrapperStyle={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#3a5a72' }} />
             {activeSites.map(s => (
               <Line key={s.id} type="monotone" dataKey={s.name}
@@ -143,7 +143,7 @@ export function PacketLossChart({ trendData, selectedSite, trendHours }: ChartsP
             <CartesianGrid strokeDasharray="3 3" stroke="#1a2e42" />
             <XAxis dataKey="time" tick={{ fill: '#3a5a72', fontSize: 10 }} stroke="#1a2e42" interval="preserveStartEnd" />
             <YAxis tick={{ fill: '#3a5a72', fontSize: 10 }} stroke="#1a2e42" unit="%" width={45} />
-            <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v.toFixed(3)}%`]} />
+            <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${Number(v).toFixed(3)}%`]} />
             <Legend wrapperStyle={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: '#3a5a72' }} />
             {activeSites.map(s => (
               <Area key={s.id} type="monotone" dataKey={s.name}
